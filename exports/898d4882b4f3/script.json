@@ -1,0 +1,23 @@
+{
+  "title": "샘플 · 핵심 구간 추출",
+  "hook": "샘플 · 핵심 구간 추출",
+  "caption": "샘플 · 핵심 구간 추출\n\n앞서 생성한 샘플의 6.5~15.3초 구간을 원본 음성과 함께 추출합니다.\n\n저장하고 다음 영상에서 만나요.",
+  "scenes": [
+    {
+      "text": "샘플 · 핵심 구간 추출",
+      "narration": "샘플 · 핵심 구간 추출",
+      "duration": 8.0
+    }
+  ],
+  "hashtags": [
+    "#릴스",
+    "#콘텐츠"
+  ],
+  "provider": "template",
+  "notice": "원본 영상의 지정 구간을 사용합니다. 음성 인식 연결 전에는 원본 대사 자막을 생성하지 않습니다.",
+  "rendered_duration": 8.819,
+  "mode": "highlights",
+  "clip_start": 6.5,
+  "clip_end": 15.3,
+  "original_audio_preserved": true
+}

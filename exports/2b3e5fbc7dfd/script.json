@@ -1,0 +1,50 @@
+{
+  "title": "샘플 · AI 업무 가이드",
+  "hook": "더 명확하게 지시하는 법",
+  "scenes": [
+    {
+      "text": "더 명확하게 지시하는 법",
+      "narration": "AI 업무 가이드 샘플을 소개합니다.",
+      "duration": 4
+    },
+    {
+      "text": "목표 · 맥락 · 기준",
+      "narration": "목표, 맥락, 기준. 세 가지 항목으로 정리해 보세요.",
+      "duration": 5
+    },
+    {
+      "text": "내 제품으로 바꿔 보세요",
+      "narration": "사진과 설명을 바꾸면 나만의 홍보 영상이 됩니다.",
+      "duration": 5
+    }
+  ],
+  "caption": "Reel Studio 상품 모드 데모입니다. 실제 판매 상품이 아닙니다.",
+  "hashtags": [
+    "#릴스제작",
+    "#샘플"
+  ],
+  "provider": "manual",
+  "rendered_duration": 15.855,
+  "mode": "product",
+  "rendered_scenes": [
+    {
+      "start": 0.0,
+      "duration": 4.0,
+      "text": "더 명확하게 지시하는 법",
+      "narration": "AI 업무 가이드 샘플을 소개합니다."
+    },
+    {
+      "start": 4.0,
+      "duration": 6.8333,
+      "text": "목표 · 맥락 · 기준",
+      "narration": "목표, 맥락, 기준. 세 가지 항목으로 정리해 보세요."
+    },
+    {
+      "start": 10.8333,
+      "duration": 5.0,
+      "text": "내 제품으로 바꿔 보세요",
+      "narration": "사진과 설명을 바꾸면 나만의 홍보 영상이 됩니다."
+    }
+  ],
+  "tts_provider": "windows"
+}
