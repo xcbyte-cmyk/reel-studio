@@ -5,6 +5,7 @@ import os
 import sqlite3
 import threading
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,15 +33,25 @@ def connect():
     return conn
 
 
+@contextmanager
+def connection():
+    conn = connect()
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
+
+
 def save(kind, record):
-    with LOCK, connect() as conn:
+    with LOCK, connection() as conn:
         conn.execute('INSERT OR REPLACE INTO records VALUES (?,?,?)',
                      (kind, record['id'], json.dumps(record, ensure_ascii=False)))
     return record
 
 
 def get(kind, record_id):
-    with LOCK, connect() as conn:
+    with LOCK, connection() as conn:
         row = conn.execute('SELECT body FROM records WHERE kind=? AND id=?', (kind, record_id)).fetchone()
     if not row:
         raise ValueError('요청한 항목이 없습니다.')
@@ -48,7 +59,7 @@ def get(kind, record_id):
 
 
 def all_records(kind):
-    with LOCK, connect() as conn:
+    with LOCK, connection() as conn:
         rows = conn.execute('SELECT body FROM records WHERE kind=? ORDER BY rowid DESC', (kind,)).fetchall()
     return [json.loads(row[0]) for row in rows]
 

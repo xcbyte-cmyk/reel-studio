@@ -1,26 +1,29 @@
 "use strict";
 
-const $ = (selector, parent = document) => parent.querySelector(selector);
-const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
-const modes = {knowledge:"정보 · 지식", product:"제품 · 브랜드", highlights:"영상 하이라이트"};
-const modeEnglish = {knowledge:"TIP & INSIGHT",product:"PRODUCT & BRAND",highlights:"CLIP & HIGHLIGHT"};
-const deliveries = {export:"파일로 내보내기",approval:"확인 후 업로드",auto:"자동 업로드"};
-const statuses = {queued:"대기 중",draft:"초안",generating:"대본 생성 중",rendering:"영상 편집 중",ready:"제작 완료",approved:"승인됨",scheduled:"예약됨",publishing:"게시 중",published:"게시 완료",failed:"오류"};
-const activeStatuses = new Set(["queued","generating","rendering","publishing"]);
-const state = {jobs:[],settings:{},capabilities:{},automations:[],selectedId:null,job:null,assets:[],script:null,formDirty:false,scriptDirty:false,busy:false,uploading:0,view:"studio",connected:false,polling:false,initialized:false};
+const {
+  $, $$, modes, modeEnglish, deliveries, statuses, activeStatuses,
+  icon, node, api, dateLabel, localDatetime, jobAssetUrl,
+} = window.ReelCore;
 
-function icon(name){const el=document.createElementNS("http://www.w3.org/2000/svg","svg");const use=document.createElementNS("http://www.w3.org/2000/svg","use");use.setAttribute("href",`#i-${name}`);el.append(use);return el;}
-function node(tag,className,text){const el=document.createElement(tag);if(className)el.className=className;if(text!==undefined)el.textContent=text;return el;}
+const state = {
+  jobs: [], settings: {}, capabilities: {}, automations: [],
+  selectedId: null, job: null, assets: [], script: null,
+  formDirty: false, scriptDirty: false, busy: false, uploading: 0,
+  view: "studio", connected: false, polling: false, initialized: false,
+};
+
 function toast(message,error=false){const el=node("div",`toast${error?" error":""}`);el.append(icon(error?"close":"check"),node("span","",message));const close=node("button");close.type="button";close.setAttribute("aria-label","알림 닫기");close.append(icon("close"));close.onclick=()=>el.remove();el.append(close);$("#toast-region").append(el);setTimeout(()=>el.remove(),error?12000:5000);}
-async function api(path,options={}){const headers=options.raw?{}:{"Content-Type":"application/json"};const response=await fetch(path,{...options,headers:{...headers,...options.headers},body:options.body===undefined?undefined:options.raw?options.body:JSON.stringify(options.body)});const text=await response.text();let result;try{result=text?JSON.parse(text):{};}catch{throw new Error(`서버 응답을 읽지 못했습니다 (${response.status}).`);}if(!response.ok)throw new Error(result.error||`요청을 처리하지 못했습니다 (${response.status}).`);return result;}
-function dateLabel(value,withTime=false){if(!value)return"";const date=new Date(value);return Number.isNaN(date.getTime())?String(value):date.toLocaleString("ko-KR",withTime?{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}:{year:"numeric",month:"2-digit",day:"2-digit"});}
-function localDatetime(value){if(!value)return"";const d=new Date(value);if(Number.isNaN(d.getTime()))return"";return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);}
+
 function setValue(selector,value){$(selector).value=value??"";}
 function setChoice(name,value){const selected=$(`input[name="${name}"][value="${value}"]`);if(selected)selected.checked=true;}
 function currentMode(){return $('input[name="mode"]:checked').value;}
 function currentDelivery(){return $('input[name="delivery"]:checked').value;}
-function statusPill(job){const el=node("span",`status-pill ${job.status}${activeStatuses.has(job.status)?" active":""}`,job.status==="ready"&&job.delivery==="approval"?"승인 대기":statuses[job.status]||job.status);if(job.status==="ready"&&job.delivery==="approval")el.textContent="승인 대기";return el;}
-function jobAssetUrl(value){if(!value)return"";if(typeof value==="string")return value;if(typeof value==="object")return value.url||value.path||"";return"";}
+function statusPill(job) {
+  const awaitingApproval = job.status === "ready" && job.delivery === "approval";
+  const className = `status-pill ${job.status}${activeStatuses.has(job.status) ? " active" : ""}`;
+  return node("span", className, awaitingApproval ? "승인 대기" : statuses[job.status] || job.status);
+}
+
 function updateJob(job){if(!job?.id)return;const index=state.jobs.findIndex(item=>item.id===job.id);if(index<0)state.jobs.unshift(job);else state.jobs[index]=job;if(state.selectedId===job.id)state.job=job;renderJobs();}
 
 const viewNames = {studio:"제작 스튜디오",jobs:"콘텐츠 보관함",automations:"자동화 스케줄",setup:"초기 설정 가이드"};
@@ -68,11 +71,67 @@ async function uploadFiles(files){const accepted=[...files].filter(file=>file.ty
 
 function renderPreview(){const videoUrl=jobAssetUrl(state.job?.artifacts?.video);const video=$("#video-preview");if(videoUrl){if(video.getAttribute("src")!==videoUrl)video.src=videoUrl;video.hidden=false;$("#storyboard").hidden=true;$("#preview-badge").textContent="RENDERED VIDEO";$("#preview-help").textContent="완성된 릴스입니다. 재생해 내용을 확인하세요.";}else{video.hidden=true;video.removeAttribute("src");$("#storyboard").hidden=false;$("#preview-badge").textContent="STORYBOARD";$("#preview-help").innerHTML="위 화면은 구성 미리보기입니다.<br>편집이 끝나면 완성 영상이 표시됩니다.";}const mode=currentMode();$("#storyboard-category").textContent=modeEnglish[mode];$("#storyboard-title").textContent=state.script?.hook||$("#topic").value.trim()||"다음 이야기는\n여기서 시작됩니다.";$("#storyboard-title").style.whiteSpace="pre-line";$("#storyboard-subtitle").textContent=state.script?.scenes?.[0]?.text||($("#brand").value.trim()?`${$("#brand").value.trim()}의 새로운 이야기`:"주제를 입력하고\n나만의 릴스를 만들어 보세요.");$("#storyboard-subtitle").style.whiteSpace="pre-line";const duration=state.job?.artifacts?.duration||Number($("#duration").value)||30;$("#preview-duration").textContent=`${Math.round(duration*10)/10}초`;$("#preview-meta-mode").textContent=modes[mode];}
 function sceneCard(scene,index){const card=node("div","scene-card");const heading=node("div","scene-heading");heading.append(node("strong","",`SCENE ${String(index+1).padStart(2,"0")}`));const durationLabel=node("label","","길이 ");const input=node("input","scene-duration");input.type="number";input.min="1";input.max="180";input.step="0.5";input.value=scene.duration||5;input.setAttribute("aria-label",`장면 ${index+1} 길이`);durationLabel.append(input,node("span","","초"));heading.append(durationLabel);const remove=node("button","icon-button");remove.type="button";remove.setAttribute("aria-label",`장면 ${index+1} 삭제`);remove.append(icon("close"));remove.onclick=()=>{state.script=collectScript();state.script.scenes.splice(index,1);state.scriptDirty=true;renderScript();};heading.append(remove);card.append(heading);for(const [kind,label] of [["text","화면 문구"],["narration","내레이션"]]){const field=node("div","field");const fieldLabel=node("label","",label);const textarea=node("textarea",`scene-${kind}`);textarea.rows=2;textarea.value=scene[kind]||"";textarea.id=`scene-${index}-${kind}`;fieldLabel.htmlFor=textarea.id;field.append(fieldLabel,textarea);card.append(field);}card.addEventListener("input",onScriptInput);return card;}
-function renderScript(){const panel=$("#script-panel");panel.hidden=!state.script;if(!state.script)return;setValue("#script-title",state.script.title);setValue("#script-hook",state.script.hook);setValue("#script-caption",state.script.caption);setValue("#script-hashtags",(state.script.hashtags||[]).join(" "));$("#scene-list").replaceChildren(...(state.script.scenes||[]).map(sceneCard));updateScriptDuration();$("#script-save-state").textContent=state.scriptDirty?"저장하지 않은 수정 사항":"대본이 저장되어 있습니다.";updateActions();}
+function renderScript() {
+  $("#script-panel").hidden = !state.script;
+  if (!state.script) {
+    $("#scene-list").replaceChildren();
+    updateScriptDuration();
+    updateActions();
+    return;
+  }
+  setValue("#script-title", state.script.title);
+  setValue("#script-hook", state.script.hook);
+  setValue("#script-caption", state.script.caption);
+  setValue("#script-hashtags", (state.script.hashtags || []).join(" "));
+  $("#scene-list").replaceChildren(...(state.script.scenes || []).map(sceneCard));
+  updateScriptDuration();
+  $("#script-save-state").textContent = state.scriptDirty
+    ? "저장하지 않은 수정 사항" : "대본이 저장되어 있습니다.";
+  updateActions();
+}
 function updateScriptDuration(){const total=$$('.scene-duration').reduce((sum,input)=>sum+(Number(input.value)||0),0);$("#script-duration").textContent=`${$$('.scene-card').length}개 장면 · ${Math.round(total*10)/10}초`;}
 function onScriptInput(){state.scriptDirty=true;$("#script-save-state").textContent="저장하지 않은 수정 사항";updateScriptDuration();const draft=collectScript();$("#storyboard-title").textContent=draft?.hook||$("#topic").value.trim();}
 
-function renderCurrentJob(){const job=state.job;$("#job-status-panel").hidden=!job;if(!job){renderPreview();updateActions();return;}const oldScript=JSON.stringify(state.script);if(job.script&&!state.scriptDirty&&JSON.stringify(job.script)!==oldScript){state.script=job.script;renderScript();}$("#current-status").replaceWith(Object.assign(statusPill(job),{id:"current-status"}));$("#current-job-title").textContent=job.title||job.topic||"제목 없는 릴스";$("#job-progress").style.width=`${Math.min(100,Math.max(0,Number(job.progress)||0))}%`;$("#job-message").textContent=job.message||({draft:"기획을 다듬고 제작을 시작하세요.",ready:"영상 제작이 완료되었습니다.",scheduled:`게시 예약 · ${dateLabel(job.scheduled_at,true)}`,published:"인스타그램 게시가 완료되었습니다."}[job.status]||"");$("#job-error").hidden=!job.error;$("#job-error").textContent=typeof job.error==="object"?JSON.stringify(job.error):job.error||"";const warnings=job.artifacts?.warnings||[];$("#job-warnings").hidden=!warnings.length;$("#job-warnings").textContent=Array.isArray(warnings)?warnings.join("\n"):String(warnings);renderDownloads(job);renderPublishActions(job);renderEvents(job);let step=job.status==="generating"?2:job.status==="rendering"?3:["publishing","published","approved","scheduled"].includes(job.status)?4:job.artifacts?.video?4:job.script?2:1;$$('.workflow-step').forEach(el=>{const value=Number(el.dataset.step);el.classList.toggle("active",value===step);el.classList.toggle("done",value<step);});renderPreview();updateActions();}
+function renderCurrentJob() {
+  const job = state.job;
+  $("#job-status-panel").hidden = !job;
+  if (!job) {
+    renderPreview();
+    updateActions();
+    return;
+  }
+  const nextScript = job.script || null;
+  if (!state.scriptDirty && JSON.stringify(nextScript) !== JSON.stringify(state.script)) {
+    state.script = nextScript;
+    renderScript();
+  }
+  $("#current-status").replaceWith(Object.assign(statusPill(job), { id: "current-status" }));
+  $("#current-job-title").textContent = job.title || job.topic || "제목 없는 릴스";
+  $("#job-progress").style.width = `${Math.min(100, Math.max(0, Number(job.progress) || 0))}%`;
+  const messages = {
+    draft: "기획을 다듬고 제작을 시작하세요.", ready: "영상 제작이 완료되었습니다.",
+    scheduled: `게시 예약 · ${dateLabel(job.scheduled_at, true)}`, published: "인스타그램 게시가 완료되었습니다.",
+  };
+  $("#job-message").textContent = job.message || messages[job.status] || "";
+  $("#job-error").hidden = !job.error;
+  $("#job-error").textContent = typeof job.error === "object" ? JSON.stringify(job.error) : job.error || "";
+  const warnings = job.artifacts?.warnings || [];
+  $("#job-warnings").hidden = !warnings.length;
+  $("#job-warnings").textContent = Array.isArray(warnings) ? warnings.join("\n") : String(warnings);
+  renderDownloads(job);
+  renderPublishActions(job);
+  renderEvents(job);
+  const publishing = ["publishing", "published", "approved", "scheduled"].includes(job.status);
+  const step = job.status === "generating" ? 2 : job.status === "rendering" ? 3
+    : publishing || job.artifacts?.video ? 4 : job.script ? 2 : 1;
+  $$(".workflow-step").forEach(element => {
+    const value = Number(element.dataset.step);
+    element.classList.toggle("active", value === step);
+    element.classList.toggle("done", value < step);
+  });
+  renderPreview();
+  updateActions();
+}
 function renderDownloads(job){const list=$("#download-list");list.replaceChildren();for(const [key,label] of [["video","영상 다운로드"],["cover","커버 이미지"],["subtitles","자막 파일"],["script","대본 파일"],["caption","캡션 파일"]]){const url=jobAssetUrl(job.artifacts?.[key]);if(!url)continue;const link=node("a","download-link");link.href=url;link.download="";link.append(icon(key==="video"?"film":"download"),node("span","",label),icon("arrow"));list.append(link);}}
 function renderPublishActions(job){const list=$("#publish-actions");list.replaceChildren();const add=(label,action,style="button-primary")=>{const button=node("button",`button ${style}`,label);button.type="button";button.onclick=()=>jobAction(action);button.disabled=state.busy||activeStatuses.has(job.status);list.append(button);};if(job.status==="failed")add("작업 다시 시도","retry","button-outline");if(job.artifacts?.video&&!activeStatuses.has(job.status)&&job.status!=="published"){if(job.delivery==="approval"&&job.status!=="scheduled"&&job.status!=="approved")add(job.scheduled_at?"승인하고 예약 게시":"승인 후 게시","approve");else add(job.status==="scheduled"?"예약 대신 지금 게시":"인스타그램에 지금 게시","publish","button-dark");}const permalink=job.publish_state?.permalink||job.permalink||job.publish_result?.permalink;if(permalink){const link=node("a","button button-outline","인스타그램에서 보기");link.href=permalink;link.target="_blank";link.rel="noopener";link.append(icon("arrow"));list.append(link);}}
 function renderEvents(job){const events=(job.events||[]).slice(-20).reverse();$("#job-events").replaceChildren(...events.map(event=>{const el=node("li","",typeof event==="string"?event:event.message||event.event||event.status||"");if(typeof event==="object"&&(event.at||event.timestamp||event.created_at))el.append(node("time","",dateLabel(event.at||event.timestamp||event.created_at,true)));return el;}));$("#job-log").hidden=!events.length;}
@@ -84,12 +143,51 @@ function renderLibrary(){const filter=$("#job-filter").value;const jobs=state.jo
 
 function renderSettingsStatus(){const settings=state.settings;const configured=!!settings.openai_configured;$("#engine-status").replaceChildren(Object.assign(node("span",`status-dot${configured?" connected":""}`),{}),node("span","",configured?"AI 대본 모드":"기본 템플릿 모드"),icon("chevron"));$("#generation-note").textContent=configured?`AI 대본 · ${settings.openai_model||"설정된 모델"} · ${settings.tts_provider==="none"?"내레이션 없음":settings.tts_provider==="openai"?"AI 음성":"로컬 음성"}`:"API 키 없이 기본 템플릿 대본으로 제작합니다.";$("#highlight-selection-note").textContent=configured?"구간을 비우면 AI가 원본 음성을 분석해 주제에 맞는 하이라이트를 선택합니다. 원하는 구간은 초 단위로 지정할 수 있습니다.":"구간을 비우면 영상의 가운데 부분을 선택합니다. AI 구간 선택은 OpenAI 키 연결 후 사용할 수 있습니다.";$("#connection-dot").classList.toggle("connected",!!settings.instagram_configured);$("#connection-label").textContent=settings.instagram_configured?"인스타그램 정보 저장됨":"인스타그램 미연결";$("#connection-detail").textContent=settings.instagram_configured?"게시 시 계정 권한 확인":"설정에서 계정을 연결하세요";const caps=state.capabilities;$("#capabilities-note").textContent=`영상 편집 ${caps.ffmpeg?"준비됨":"FFmpeg 필요"} · 이미지 ${caps.pillow?"준비됨":"Pillow 필요"}${caps.windows_tts?" · 로컬 음성 사용 가능":""}`;}
 function openSettings(){const settings=state.settings;setValue("#openai-key","");setValue("#instagram-token","");$("#clear-openai").checked=false;$("#clear-instagram").checked=false;setValue("#openai-model",settings.openai_model||"gpt-4.1-mini");setValue("#tts-provider",settings.tts_provider||"windows");setValue("#tts-model",settings.openai_tts_model||"gpt-4o-mini-tts");setValue("#tts-voice",settings.openai_voice||"coral");setValue("#instagram-user-id",settings.instagram_user_id);setValue("#instagram-login",settings.instagram_login||"instagram");setValue("#instagram-api-version",settings.instagram_api_version||"v23.0");setValue("#public-base-url",settings.public_base_url);$("#share-to-feed").checked=settings.share_to_feed!==false;$("#openai-status").textContent=settings.openai_configured?"키 저장됨":"키 없음 · 템플릿 모드";$("#instagram-status").textContent=settings.instagram_configured?"계정 정보 저장됨":"미연결";$("#openai-tts-fields").hidden=$("#tts-provider").value!=="openai";$("#settings-dialog").showModal();}
-async function saveSettings(event){event.preventDefault();const button=$("#save-settings");button.disabled=true;try{const settings={openai_api_key:$("#openai-key").value.trim(),openai_model:$("#openai-model").value.trim(),tts_provider:$("#tts-provider").value,openai_tts_model:$("#tts-model").value.trim(),openai_voice:$("#tts-voice").value,instagram_token:$("#instagram-token").value.trim(),instagram_user_id:$("#instagram-user-id").value.trim(),instagram_login:$("#instagram-login").value,instagram_api_version:$("#instagram-api-version").value.trim(),public_base_url:$("#public-base-url").value.trim().replace(/\/$/,""),share_to_feed:$("#share-to-feed").checked,clear_openai:$("#clear-openai").checked,clear_instagram:$("#clear-instagram").checked};state.settings=await api("/api/settings",{method:"POST",body:settings});renderSettingsStatus();$("#settings-dialog").close();toast("설정을 저장했습니다.");}catch(error){toast(error.message,true);}finally{button.disabled=false;}}
+async function saveSettings(event){event.preventDefault();const button=$("#save-settings");button.disabled=true;try{const settings={openai_api_key:$("#openai-key").value.trim(),openai_model:$("#openai-model").value.trim(),tts_provider:$("#tts-provider").value,openai_tts_model:$("#tts-model").value.trim(),openai_voice:$("#tts-voice").value,instagram_token:$("#instagram-token").value.trim(),instagram_user_id:$("#instagram-user-id").value.trim(),instagram_login:$("#instagram-login").value,instagram_api_version:$("#instagram-api-version").value.trim(),public_base_url:$("#public-base-url").value.trim().replace(/\/$/,""),share_to_feed:$("#share-to-feed").checked,clear_openai:$("#clear-openai").checked,clear_instagram:$("#clear-instagram").checked};state.settings=await api("/api/settings",{method:"POST",body:settings});renderSettingsStatus();updateSetup();$("#settings-dialog").close();toast("설정을 저장했습니다.");}catch(error){toast(error.message,true);}finally{button.disabled=false;}}
 
 function renderAutomations(){const list=$("#automation-list");list.replaceChildren();$("#automation-count").textContent=`${state.automations.length}개`;if(!state.automations.length){list.append(emptyState("꾸준한 제작을 예약하세요","주제와 시각을 설정하면 매일 한 편씩 제작합니다.","clock"));return;}state.automations.forEach(automation=>{const card=node("article","automation-card");const top=node("div","automation-card-top");top.append(node("h3","",automation.name||"매일 릴스 제작"));const toggle=node("button",`toggle-button${automation.enabled?" enabled":""}`);toggle.type="button";toggle.setAttribute("role","switch");toggle.setAttribute("aria-checked",String(!!automation.enabled));toggle.setAttribute("aria-label",`${automation.name} ${automation.enabled?"일시 정지":"활성화"}`);toggle.append(node("span"));toggle.onclick=async()=>{toggle.disabled=true;try{const result=await api(`/api/automations/${automation.id}`,{method:"PATCH",body:{enabled:!automation.enabled}});const index=state.automations.findIndex(item=>item.id===result.id);if(index>=0)state.automations[index]=result;renderAutomations();toast(result.enabled?"자동화를 활성화했습니다.":"자동화를 일시 정지했습니다.");}catch(error){toast(error.message,true);toggle.disabled=false;}};top.append(toggle);const time=node("div","automation-time",automation.time||"09:00");time.append(node("small","",`매일 · ${automation.timezone||"Asia/Seoul"}`));card.append(top,time,node("p","",`${modes[automation.mode]||"정보 · 지식"} / ${deliveries[automation.delivery]||"파일로 내보내기"}`),node("p","automation-topics",`${(automation.topics||[]).length}개 주제 순환 · ${(automation.topics||[]).join(" → ")}`));if(automation.last_run_at||automation.last_run)card.append(node("p","",`마지막 실행 ${dateLabel(automation.last_run_at||automation.last_run,true)}`));if(automation.last_error)card.append(node("p","job-error",String(automation.last_error)));list.append(card);});}
 async function saveAutomation(event){event.preventDefault();const topics=$("#automation-topics").value.split(/\r?\n/).map(topic=>topic.trim()).filter(Boolean);if(!topics.length){toast("자동으로 제작할 주제를 한 줄에 하나씩 입력하세요.",true);return;}const mode=$("#automation-mode").value;if(mode==="highlights"&&!state.assets.some(asset=>asset.kind==="video")){toast("하이라이트 자동화에는 스튜디오에서 먼저 원본 영상을 추가하세요.",true);return;}const button=$('.automation-submit');button.disabled=true;try{const template=collectForm(false);template.mode=mode;template.delivery=$("#automation-delivery").value;template.auto_publish=template.delivery==="auto";delete template.scheduled_at;delete template.title;delete template.topic;const result=await api("/api/automations",{method:"POST",body:{name:$("#automation-name").value.trim(),enabled:$("#automation-enabled").checked,mode,delivery:$("#automation-delivery").value,topics,time:$("#automation-time").value,timezone:$("#automation-timezone").value.trim(),template}});state.automations.unshift(result);renderAutomations();toast(result.enabled?"매일 실행할 자동화를 만들었습니다.":"자동화를 저장했습니다. 활성화하면 매일 실행합니다.");$("#automation-name").value="";$("#automation-topics").value="";$("#automation-enabled").checked=false;}catch(error){toast(error.message,true);}finally{button.disabled=false;}}
 
-async function refreshState({silent=false}={}){if(state.polling)return;state.polling=true;try{const result=await api("/api/state");state.jobs=result.jobs||[];state.settings=result.settings||{};state.capabilities=result.capabilities||{};state.automations=result.automations||[];const previous=state.job;state.connected=true;state.job=state.selectedId?state.jobs.find(job=>job.id===state.selectedId)||state.job:null;renderSettingsStatus();renderJobs();if(state.job){renderCurrentJob();if(previous&&activeStatuses.has(previous.status)&&!activeStatuses.has(state.job.status)&&state.job.status!=="failed")toast(state.job.status==="published"?"릴스가 인스타그램에 게시되었습니다.":state.job.artifacts?.video?"릴스 편집이 완료되었습니다.":"대본이 준비되었습니다. 내용을 확인해 보세요.");}if(state.view==="automations")renderAutomations();if(!state.initialized){state.initialized=true;const view=location.hash.slice(1);if(Object.hasOwn(viewNames,view))showView(view);else if(!view&&!state.jobs.length)showView("setup");}}catch(error){state.connected=false;$("#engine-status").replaceChildren(node("span","status-dot"),node("span","","로컬 서버 연결 대기"));$("#connection-label").textContent="서버에 연결할 수 없습니다";$("#connection-detail").textContent="실행 창을 확인하세요";if(!silent)toast(error.message,true);}finally{state.polling=false;updateSetup();}}
+async function refreshState({ silent = false } = {}) {
+  if (state.polling) return;
+  state.polling = true;
+  try {
+    const result = await api("/api/state");
+    const previous = state.job;
+    state.jobs = result.jobs || [];
+    state.settings = result.settings || {};
+    state.capabilities = result.capabilities || {};
+    state.automations = result.automations || [];
+    state.connected = true;
+    state.job = state.selectedId ? state.jobs.find(job => job.id === state.selectedId) || state.job : null;
+    renderSettingsStatus();
+    renderJobs();
+    if (state.job) {
+      renderCurrentJob();
+      const finished = previous && activeStatuses.has(previous.status) && !activeStatuses.has(state.job.status);
+      if (finished && state.job.status !== "failed") {
+        toast(state.job.status === "published" ? "릴스가 인스타그램에 게시되었습니다."
+          : state.job.artifacts?.video ? "릴스 편집이 완료되었습니다." : "대본이 준비되었습니다. 내용을 확인해 보세요.");
+      }
+    }
+    if (state.view === "automations") renderAutomations();
+    if (!state.initialized) {
+      state.initialized = true;
+      const view = location.hash.slice(1);
+      if (Object.hasOwn(viewNames, view)) showView(view);
+      else if (!view && !state.jobs.length) showView("setup");
+    }
+  } catch (error) {
+    state.connected = false;
+    $("#engine-status").replaceChildren(node("span", "status-dot"), node("span", "", "로컬 서버 연결 대기"));
+    $("#connection-label").textContent = "서버에 연결할 수 없습니다";
+    $("#connection-detail").textContent = "실행 창을 확인하세요";
+    if (!silent) toast(error.message, true);
+  } finally {
+    state.polling = false;
+    updateSetup();
+  }
+}
 
 $$('[data-view]').forEach(button=>button.addEventListener("click",()=>showView(button.dataset.view)));
 $('.brand').addEventListener("click",event=>{event.preventDefault();showView("studio");});

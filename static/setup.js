@@ -1,6 +1,8 @@
 (function () {
   "use strict";
 
+  const { $, $$ } = window.ReelCore;
+
   let root = null;
   let actions = {};
   let snapshot = {};
@@ -111,24 +113,24 @@ winget install --id Gyan.FFmpeg -e</code></pre><p>FFmpeg 설치 후 실행 창�
   }
 
   function setStatus(name, text, mood = "neutral") {
-    const element = root?.querySelector(`[data-setup-status="${name}"]`);
+    const element = root ? $(`[data-setup-status="${name}"]`, root) : null;
     if (!element) return;
     if (element.textContent !== text) element.textContent = text;
     element.dataset.mood = mood;
   }
 
   function selectLogin(value, focus = false) {
-    root.querySelectorAll("[data-setup-login]").forEach(button => {
+    $$("[data-setup-login]", root).forEach(button => {
       const selected = button.dataset.setupLogin === value;
       button.setAttribute("aria-selected", String(selected));
       button.tabIndex = selected ? 0 : -1;
-      root.querySelector(`#setup-panel-${button.dataset.setupLogin}`).hidden = !selected;
+      $(`#setup-panel-${button.dataset.setupLogin}`, root).hidden = !selected;
       if (selected && focus) button.focus();
     });
   }
 
   async function refresh() {
-    const buttons = root.querySelectorAll("[data-setup-refresh]");
+    const buttons = $$("[data-setup-refresh]", root);
     buttons.forEach(button => { button.disabled = true; });
     setStatus("refresh", "현재 설정을 확인하고 있습니다.");
     try {
@@ -150,7 +152,7 @@ winget install --id Gyan.FFmpeg -e</code></pre><p>FFmpeg 설치 후 실행 창�
     else if (button.hasAttribute("data-setup-refresh")) refresh();
     else if (button.hasAttribute("data-setup-login")) selectLogin(button.dataset.setupLogin);
     else if (button.hasAttribute("data-setup-scroll")) {
-      root.querySelector(`#${button.dataset.setupScroll}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      $(`#${button.dataset.setupScroll}`, root)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }
 

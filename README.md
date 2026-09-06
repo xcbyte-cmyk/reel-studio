@@ -4,7 +4,7 @@
 
 ## 실행
 
-**Windows에서 `Start.cmd`를 더블 클릭**합니다. 브라우저에서 <http://127.0.0.1:18765>가 열립니다. 이 컴퓨터에는 Python, Pillow, requests, FFmpeg, ffprobe와 한국어 음성 Microsoft Heami가 설치되어 있습니다.
+**Windows에서 `Start.cmd`를 더블 클릭**합니다. 브라우저에서 <http://127.0.0.1:18765>가 열립니다. Python, Pillow, requests, FFmpeg와 ffprobe가 필요합니다. Windows 로컬 내레이션을 사용하려면 한국어 음성도 설치되어 있어야 합니다.
 
 처음 설정할 때는 앱 왼쪽 메뉴의 **초기 설정 가이드** 또는 <http://127.0.0.1:18765/#setup>를 여세요. 제작 환경 확인, 선택적인 AI 연결, Instagram 연결 방식별 절차, 첫 영상 제작, 게시·매일 자동화 설정을 순서대로 안내합니다. 각 단계의 버튼으로 실제 설정 화면에 이동할 수 있습니다. 작업 기록이 없는 새 설치에서는 가이드가 먼저 열립니다.
 
@@ -74,13 +74,17 @@ AI 키가 없으면 정보·상품 모드는 **입력 자료를 배치하는 템
 
 ## 구성
 
-- `server.py`: 로컬 HTTP API, 파일 업로드, 미리보기 스트리밍
+- `server.py`: 로컬 HTTP API 라우팅과 서버 시작·종료
+- `studio/http.py`: JSON 응답, HEAD 요청, 파일·영상 구간 스트리밍
+- `studio/assets.py`: 원본 파일 업로드와 첨부파일 조회
 - `studio/content.py`: 템플릿 / AI 대본
 - `studio/media.py`: 영상, 내레이션, 자막, 커버 합성
 - `studio/highlights.py`: 전체 원본 전사, 후보 비교, 하이라이트 선정
 - `studio/instagram.py`: Meta 업로드·게시·처리 상태 조회
-- `studio/workflow.py`: 단계 실행, 승인, 예약, 매일 자동 제작
-- `studio/store.py`: 제작 기록 및 설정 저장
+- `studio/production.py`: 대본·하이라이트 준비와 결과물 생성 순서
+- `studio/workflow.py`: 작업 실행 제어, 승인, 게시, 재시도
+- `studio/scheduling.py`: 예약 시각 처리와 매일 자동 제작. 작업 제출 함수를 전달받아 실행
+- `studio/store.py`: 제작 기록 및 설정 저장, SQLite 연결 수명 관리
 - `static/`: 한국어 제작 화면
 
 Python 3.11 이상과 FFmpeg가 필요합니다. Windows 이외에서는 OpenAI TTS 또는 무음을 선택하고 한국어 글꼴을 설치해야 합니다. 외부에서 접속하는 다중 사용자 웹 서비스 배포용으로 구성한 앱은 아닙니다.
